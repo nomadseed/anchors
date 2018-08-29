@@ -90,6 +90,9 @@ def generate_histogram_dict(anchorratios,
     # plot the chart for debug
     if debug:
         plt.hist(ratiolist,numbins,(minratio,maxratio)) 
+        plt.title('Aspect Ratio Histogram')
+        plt.xlabel('Aspect Ratio')
+        plt.ylabel('BBox count')
         plt.show()   
     
     return hist, mean, std
@@ -156,5 +159,6 @@ if __name__=='__main__':
     # generate aspect ratios for the training
     aspectratios = generate_aspect_ratios(mean, std)      
 
+    print('suggested anchor aspect ratios:\n',aspectratios)
 
 """ End of File """

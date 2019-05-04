@@ -100,8 +100,8 @@ def generate_histogram_dict(bboxes,
 
 def generate_bbox_size_histogram(bboxes, 
                                  numbins=200,
-                                 rejsize_h=22,
-                                 rejsize_w=22,
+                                 rejsize_h=15,
+                                 rejsize_w=15,
                                  debug=True):
     '''
     
@@ -186,7 +186,7 @@ def get_bboxes(annotationdict):
                         benchmarkanchor['ratio']=anno['width']/anno['height']
                         benchmarkanchor['w']=anno['width']
                         benchmarkanchor['h']=anno['height']
-                        benchmarkanchor['diag']=math.sqrt(anno['width']*anno['width']+anno['height']*anno['height'])
+                        benchmarkanchor['diag']=math.sqrt(anno['width']*anno['height'])
                         bboxes.append(benchmarkanchor)
                     benchmarkanchor={}
                 
@@ -210,13 +210,73 @@ def load_json_annotations(filepath, jsonlabel):
     
     return annotationdict
 
+def getGridFromHist(hist, threshlist=None, pel_list=None, inverse=True,rejectsize=31):
+    """
+    Covert the Histogram into Probability Density Function (PDF), set a few 
+    thresholds for Cumulative Distribution Function (CDF), and return corresponding
+    .
+    
+    """
+    for i in range(len(hist[0])):
+        if hist[1][i]<rejectsize:
+            hist[0][i]=0
+    total=np.sum(hist[0])# hist[0] are numbers in bins, hist[1] are the setup of bins
+    count=0
+    
+    if inverse:
+        """
+        input:
+            hist, pel_list
+        output:
+            thresh_list
+        
+        """
+        thresh_list=[]
+        for pel_thresh in pel_list:
+            for i in range(len(hist[0])):
+                count+=hist[0][i]
+                pel=hist[1][i]
+                if pel > pel_thresh:
+                    thresh_list.append(float(count)/total)
+                    count=0
+                    break
+        return thresh_list
+    else:
+        """
+        input:
+            hist, thresh_list
+        output:
+            pel_list
+        
+        """
+        pel_list=[]
+        for thresh in threshlist:
+            for i in range(len(hist[0])):
+                count+=hist[0][i]
+                percent=float(count)/total
+                if percent>=thresh:
+                    pel_list.append(hist[1][i])
+                    count=0
+                    break
+        return pel_list
+
+def drawCDF(pel_list, hist_thresh_list):
+    chartaxis = [0.0,800.0,0.0,1.0]
+    plt.figure(figsize=(4,4),dpi=100)
+    plt.axis(chartaxis)
+    plt.plot(pel_list, hist_thresh_list,'bo-')
+    plt.title('CDF over pixel size of bbox')
+    plt.xlabel('pixel size')
+    plt.ylabel('probability')
+    plt.show()
+
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--file_path', type=str, 
-                        default='D:/Private Manager/Personal File/uOttawa/Lab works/2018 fall/BerkleyDeepDrive/debug/bdd100k', 
+                        default='D:/Private Manager/Personal File/uOttawa/Lab works/2018 fall/BerkleyDeepDrive/bdd100k', 
                         help="File path of input data")
     parser.add_argument('--json_label', type=str, 
-                        default='crop', 
+                        default='val_VIVA_format_crop_gt22.json', 
                         help="label to specify json file")
     args = parser.parse_args()
     
@@ -235,10 +295,33 @@ if __name__=='__main__':
     # generate aspect ratios for the training
     aspectratios = generate_aspect_ratios(mean, std)      
 
-    print('suggested anchor aspect ratios:\n',aspectratios)
+    print('suggested Gaussian anchor aspect ratios:\n',aspectratios)
     
     # generate histogram of bbox size
-    h_hist, w_hist, _ = generate_bbox_size_histogram(bboxes)
+    h_hist, w_hist, diag_hist = generate_bbox_size_histogram(bboxes)
+    
+# =============================================================================
+#     # get grid size from bbox
+#     #hist_thresh_list=[0.15,0.3,0.6,0.9]
+#     hist_thresh_list=[0.05,0.1,0.15,0.2,0.25,
+#                       0.3,0.35,0.4,0.5,0.6,
+#                       0.7,0.8,0.9,0.99,1.0]
+#     pel_list = getGridFromHist(diag_hist, threshlist=hist_thresh_list, 
+#                                       pel_list=None, inverse=False)
+#     grid_list = [ round(800.0/i) for i in pel_list ]
+#     drawCDF(pel_list, hist_thresh_list)
+# =============================================================================
     
     
+    # bbox numbers for grid sizes
+    gridlist=[19,10,5,3,2,1] 
+    # 19 derive from rejected size, 19,10,5 from distribution (thresh 30%,60%,90%),
+    # 19 repeated thus removed, 3,2,1 added for improving
+    # the capability of detecting near vehicles even the number of bbox for these
+    # two grid sizes are few
+    h_pel_list=[800/i for i in gridlist]
+    percentage_list = getGridFromHist(diag_hist, threshlist=None, 
+                                      pel_list=h_pel_list, inverse=True)
+    
+        
 """ End of File """
